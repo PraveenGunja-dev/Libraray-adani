@@ -7,7 +7,7 @@ import DataTable from '../../components/DataTable.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import api from '../../lib/api.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/library/api';
 const FORMATS = ['Hardcover', 'Paperback', 'E-Book', 'Journal', 'Magazine', 'Other'];
 
 function AddBookModal({ onClose, onSaved }) {
@@ -207,8 +207,8 @@ function EditBookModal({ book, onClose, onSaved }) {
 
 
 function QRModal({ book, onClose }) {
-  // Use the public uploads path (no auth needed) instead of the API endpoint
-  const BASE_URL = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace('/api', '');
+  // Use the relative /library path to ensure it works via Nginx and locally
+  const BASE_URL = import.meta.env.VITE_API_BASE ? import.meta.env.VITE_API_BASE.replace('/api', '') : '/library';
   const qrSrc = book.qr_code_path
     ? `${BASE_URL}/${book.qr_code_path}`
     : `${BASE_URL}/uploads/qr/${book.qr_token}.png`;
