@@ -57,7 +57,7 @@ def create_app(config_class=Config):
     def health():
         return {"status": "ok"}
 
-    @app.route("/uploads/<path:filename>")
+    @app.route("/library/uploads/<path:filename>")
     def serve_upload(filename):
         return send_from_directory(uploads_base, filename)
 
