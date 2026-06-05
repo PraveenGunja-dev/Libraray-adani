@@ -17,7 +17,7 @@ def _build_scan_url(token: str) -> str:
     path-based URL that works when scanned from any device on the
     same network.
     """
-    frontend_url = os.environ.get("FRONTEND_URL", "")
+    frontend_url = os.environ.get("FRONTEND_URL", "https://digitalized-dpr-uat.adani.com/library")
     if frontend_url:
         return f"{frontend_url.rstrip('/')}/employee/scan?token={token}"
     # Fallback: encode just the path — when scanned with a phone camera,
