@@ -40,15 +40,15 @@ def create_app(config_class=Config):
 
     from app.routes.employees import employees_bp
 
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(books_bp)
-    app.register_blueprint(borrow_bp)
-    app.register_blueprint(reservations_bp)
-    app.register_blueprint(lost_bp)
-    app.register_blueprint(notifications_bp)
-    app.register_blueprint(admin_bp)
-    app.register_blueprint(settings_bp)
-    app.register_blueprint(employees_bp)
+    app.register_blueprint(admin_bp, url_prefix='/library/api/admin')
+    app.register_blueprint(auth_bp, url_prefix='/library/api/auth')
+    app.register_blueprint(books_bp, url_prefix='/library/api/books')
+    app.register_blueprint(employees_bp, url_prefix='/library/api/employees')
+    app.register_blueprint(borrow_bp, url_prefix='/library/api/borrow')
+    app.register_blueprint(lost_bp, url_prefix='/library/api/lost')
+    app.register_blueprint(reservations_bp, url_prefix='/library/api/reservations')
+    app.register_blueprint(notifications_bp, url_prefix='/library/api/notifications')
+    app.register_blueprint(settings_bp, url_prefix='/library/api/settings')
 
     # Start APScheduler for overdue checks
     _start_scheduler(app)
@@ -61,13 +61,18 @@ def create_app(config_class=Config):
     def serve_upload(filename):
         return send_from_directory(uploads_base, filename)
 
-    @app.route('/', defaults={'path': ''})
-    @app.route('/<path:path>')
+    @app.route('/library/', defaults={'path': ''})
+    @app.route('/library/<path:path>')
     def serve_frontend(path):
         frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
         if path != "" and os.path.exists(os.path.join(frontend_dist, path)):
             return send_from_directory(frontend_dist, path)
         return send_from_directory(frontend_dist, 'index.html')
+
+    @app.route('/')
+    def root_redirect():
+        from flask import redirect
+        return redirect('/library/')
 
     return app
 
