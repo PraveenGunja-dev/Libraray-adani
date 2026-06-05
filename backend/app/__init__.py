@@ -5,8 +5,7 @@ from app.extensions import db, migrate, jwt, cors
 
 
 def create_app(config_class=Config):
-    frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
-    app = Flask(__name__, instance_relative_config=False, static_folder=frontend_dist, static_url_path="/")
+    app = Flask(__name__, instance_relative_config=False)
     app.config.from_object(config_class)
     app.url_map.strict_slashes = False
 
@@ -65,9 +64,10 @@ def create_app(config_class=Config):
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve_frontend(path):
-        if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
-            return send_from_directory(app.static_folder, path)
-        return send_from_directory(app.static_folder, 'index.html')
+        frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+        if path != "" and os.path.exists(os.path.join(frontend_dist, path)):
+            return send_from_directory(frontend_dist, path)
+        return send_from_directory(frontend_dist, 'index.html')
 
     return app
 
