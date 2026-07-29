@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Login from './pages/Login.jsx';
 import PinChange from './pages/PinChange.jsx';
 import EmployeeDashboard from './pages/employee/EmployeeDashboard.jsx';
-import QRScan from './pages/employee/QRScan.jsx';
 import BookBorrow from './pages/employee/BookBorrow.jsx';
 import Reservations from './pages/employee/Reservations.jsx';
 import ReturnBook from './pages/employee/ReturnBook.jsx';
@@ -14,7 +13,8 @@ import EmployeeManagement from './pages/admin/EmployeeManagement.jsx';
 import ReservationManagement from './pages/admin/ReservationManagement.jsx';
 import Reports from './pages/admin/Reports.jsx';
 import Settings from './pages/admin/Settings.jsx';
-import lostRequests from './pages/admin/lostRequests.jsx';
+import LostRequests from './pages/admin/LostRequests.jsx';
+import QRScan from './pages/admin/QRScan.jsx';
 import AppShell from './components/AppShell.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -26,7 +26,6 @@ export default function App() {
       <Route path="/employee" element={<ProtectedRoute role="employee" />}>
         <Route element={<AppShell mode="employee" />}>
           <Route index element={<EmployeeDashboard />} />
-          <Route path="scan" element={<QRScan />} />
           <Route path="book" element={<BookBorrow />} />
           <Route path="reservations" element={<Reservations />} />
           <Route path="return" element={<ReturnBook />} />
@@ -37,10 +36,11 @@ export default function App() {
       <Route path="/admin" element={<ProtectedRoute role="admin" />}>
         <Route element={<AppShell mode="admin" />}>
           <Route index element={<AdminDashboard />} />
+          <Route path="scan" element={<QRScan />} />
           <Route path="books" element={<BookManagement />} />
           <Route path="employees" element={<EmployeeManagement />} />
           <Route path="reservations" element={<ReservationManagement />} />
-          <Route path="lost" element={<lostRequests />} />
+          <Route path="lost" element={<LostRequests />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
         </Route>

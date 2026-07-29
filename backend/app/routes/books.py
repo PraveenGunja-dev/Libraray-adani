@@ -3,6 +3,7 @@ import os
 import uuid
 
 from flask import Blueprint, current_app, jsonify, make_response, request, send_file
+# pyrefly: ignore [missing-import]
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from app.extensions import db

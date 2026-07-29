@@ -9,7 +9,7 @@ const TYPE_LABEL = {
   due_reminder: 'Due reminder',
   overdue: 'Overdue',
   reservation_ready: 'Reservation ready',
-  lost_update: 'lost update',
+  lost_update: 'Lost update',
   system: 'System',
 };
 

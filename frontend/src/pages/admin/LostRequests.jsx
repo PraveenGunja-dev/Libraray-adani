@@ -12,7 +12,7 @@ function fmt(dt) {
   return new Date(dt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-export default function lostRequests() {
+export default function LostRequests() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(null);
@@ -101,8 +101,8 @@ export default function lostRequests() {
     <>
       <PageHeader
         eyebrow="Security"
-        title="lost Book Requests"
-        description="Review employee-reported lost or lost book copies. Approving removes the copy from inventory permanently."
+        title="Lost Book Requests"
+        description="Review employee-reported lost book copies. Approving removes the copy from inventory permanently."
         action={<ActionButton icon={RefreshCw} variant="subtle" onClick={load}>Refresh</ActionButton>}
       />
 

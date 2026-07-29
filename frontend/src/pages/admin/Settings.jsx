@@ -27,7 +27,7 @@ export default function Settings() {
     setLoading(true);
     try {
       const res = await api.get('/settings');
-      setSettings({ ...DEFAULTS, ...res });
+      setSettings({ ...DEFAULTS, ...(res.settings || res) });
     } catch {
       setSettings(DEFAULTS);
     } finally {

@@ -1,4 +1,4 @@
-import { Bell, BookOpen, CalendarClock, ClipboardList, QrCode, RefreshCcw } from 'lucide-react';
+import { Bell, BookOpen, CalendarClock, ClipboardList, RefreshCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Badge from '../../components/Badge.jsx';
@@ -9,7 +9,6 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import api from '../../lib/api.js';
 
 const QUICK_ACTIONS = [
-  { label: 'Scan Book QR', icon: QrCode, to: '/employee/scan' },
   { label: 'My Borrowed Books', icon: BookOpen, to: '/employee/book' },
   { label: 'My Reservations', icon: ClipboardList, to: '/employee/reservations' },
   { label: 'Return Book', icon: RefreshCcw, to: '/employee/return' },
@@ -20,7 +19,7 @@ const TYPE_LABEL = {
   due_reminder: 'Due reminder',
   overdue: 'Overdue',
   reservation_ready: 'Reservation ready',
-  lost_update: 'lost update',
+  lost_update: 'Lost update',
   system: 'System',
 };
 

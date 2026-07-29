@@ -17,13 +17,15 @@ def _build_scan_url(token: str) -> str:
     path-based URL that works when scanned from any device on the
     same network.
     """
+    # Scanning is an admin/librarian-desk workflow, not employee self-service —
+    # the QR must resolve to the admin scan screen.
     frontend_url = os.environ.get("FRONTEND_URL", "https://digitalized-dpr-uat.adani.com/library")
     if frontend_url:
-        return f"{frontend_url.rstrip('/')}/employee/scan?token={token}"
+        return f"{frontend_url.rstrip('/')}/admin/scan?token={token}"
     # Fallback: encode just the path — when scanned with a phone camera,
     # most QR apps will try to open it as a URL if it looks like one.
     # We use a relative path that the frontend can handle.
-    return f"/employee/scan?token={token}"
+    return f"/admin/scan?token={token}"
 
 
 def generate_qr_png(token: str) -> str:

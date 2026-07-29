@@ -9,7 +9,7 @@ Built with **React 19 + Vite 7** (frontend) and **Flask 3 + PostgreSQL 14** (bac
 ## Features
 
 - **Role-based access** — Admin and Employee portals with JWT authentication
-- **QR code workflow** — Generate printable QR sheets; scan via device camera to borrow
+- **QR code workflow** — Generate printable QR sheets; admin scans at the circulation desk to issue or reserve on an employee's behalf
 - **Book lifecycle** — Borrow, return, reserve (queue), and report stolen
 - **Overdue management** — Daily scheduler marks overdue books and fires notifications
 - **Admin analytics** — KPI cards, trend charts (monthly issued/returned/overdue), top books, category distribution
@@ -204,12 +204,12 @@ PIN defaults to the user's DOB in `DDMMYY` format. A forced PIN-change screen ap
 | `/pin-change` | Forced PIN change | Authenticated (default PIN) |
 | `/employee/dashboard` | My borrows + stats | Employee |
 | `/employee/borrow` | Browse & borrow books | Employee |
-| `/employee/qr-scan` | Camera QR scan | Employee |
 | `/employee/return` | Return a book | Employee |
 | `/employee/reservations` | My reservation queue | Employee |
 | `/employee/profile` | Profile + change PIN | Employee |
 | `/notifications` | Notification centre | Authenticated |
 | `/admin/dashboard` | KPIs + analytics charts | Admin |
+| `/admin/scan` | Circulation-desk QR scan — issue or reserve on behalf of any employee | Admin |
 | `/admin/books` | Book CRUD, Excel import, QR print | Admin |
 | `/admin/employees` | Employee list + role management | Admin |
 | `/admin/reservations` | All reservation queues | Admin |
@@ -367,7 +367,7 @@ After a fresh `flask db upgrade && python seed.py`:
 4. **Settings** — Admin → Settings → confirm default borrow days = 7. Change and save, then revert.
 5. **Employee login** — `employee@adani.com` / `150695`. Forced PIN-change.
 6. **Browse & borrow** — Employee → Borrow Books → pick a book → set custom days → Borrow. Appears in dashboard as active borrow.
-7. **QR scan** — Employee → QR Scan → point camera at a printed QR → lands on BookBorrow with book pre-filled.
+7. **QR scan (circulation desk)** — Admin → Scan QR → point camera at a printed QR → type or pick the employee → Issue (copy-level) or Reserve (book-level).
 8. **Return** — Employee → Return Book → return the active borrow. Status flips to returned.
 9. **Report stolen** — Employee → Borrow Books → "Report Stolen" on a copy → submit reason.
 10. **Admin approve stolen** — Admin → Stolen Requests → Approve. Confirm copy disappears from book list.

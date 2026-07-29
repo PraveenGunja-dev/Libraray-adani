@@ -2,6 +2,8 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from app.models.reservation import Reservation
+from app.models.user import User
+from app.services.audit_service import log_action
 from app.services.inventory_service import cancel_reservation, reserve_book, approve_reservation
 
 reservations_bp = Blueprint("reservations", __name__, url_prefix="/api/reservations")
@@ -20,6 +22,7 @@ def _is_admin() -> bool:
 def create_reservation():
     data = request.get_json(silent=True) or {}
     book_id = data.get("book_id")
+    employee_email = (data.get("employee_email") or "").strip().lower()
 
     if not book_id:
         return jsonify({"error": "book_id is required"}), 400
@@ -29,8 +32,17 @@ def create_reservation():
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid book_id"}), 400
 
+    target_user_id = _current_user_id()
+    if employee_email:
+        if not _is_admin():
+            return jsonify({"error": "Only an admin can reserve a book for another employee"}), 403
+        employee = User.query.filter_by(email=employee_email, role="employee").first()
+        if not employee:
+            return jsonify({"error": f"No employee found with email {employee_email}"}), 404
+        target_user_id = employee.id
+
     try:
-        reservation = reserve_book(_current_user_id(), book_id)
+        reservation = reserve_book(target_user_id, book_id)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -48,6 +60,7 @@ def approve(reservation_id: int):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    log_action(_current_user_id(), "reservation_approve", "reservation", reservation_id)
     return jsonify({"borrow_record": record.to_dict()}), 200
 
 
@@ -81,6 +94,7 @@ def cancel(reservation_id: int):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    log_action(_current_user_id(), "reservation_cancel", "reservation", reservation_id)
     return jsonify({"reservation": reservation.to_dict()}), 200
 
 

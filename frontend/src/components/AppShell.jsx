@@ -23,7 +23,6 @@ import Logo from './Logo.jsx';
 
 const employeeNav = [
   { label: 'Dashboard', to: '/employee', icon: LayoutDashboard },
-  { label: 'Scan QR', to: '/employee/scan', icon: QrCode },
   { label: 'My Books', to: '/employee/book', icon: BookOpen },
   { label: 'Reservations', to: '/employee/reservations', icon: ClipboardList },
   { label: 'Return Book', to: '/employee/return', icon: RefreshCcw },
@@ -33,10 +32,11 @@ const employeeNav = [
 
 const adminNav = [
   { label: 'Dashboard', to: '/admin', icon: LayoutDashboard },
+  { label: 'Scan QR', to: '/admin/scan', icon: QrCode },
   { label: 'Books', to: '/admin/books', icon: BookOpen },
   { label: 'Employees', to: '/admin/employees', icon: Users },
   { label: 'Reservations', to: '/admin/reservations', icon: ClipboardList },
-  { label: 'lost Requests', to: '/admin/lost', icon: AlertTriangle },
+  { label: 'Lost Requests', to: '/admin/lost', icon: AlertTriangle },
   { label: 'Reports', to: '/admin/reports', icon: ChartColumn },
   { label: 'Settings', to: '/admin/settings', icon: Settings },
 ];

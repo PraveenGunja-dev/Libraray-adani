@@ -3,6 +3,7 @@ from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 
 from app.models.lost_request import LostRequest
 from app.models.book_copy import BookCopy
+from app.services.audit_service import log_action
 from app.services.inventory_service import approve_lost, reject_lost
 from app.extensions import db
 
@@ -109,6 +110,7 @@ def approve(lost_id: int):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    log_action(_current_user_id(), "lost_approve", "lost_request", lost_id)
     return jsonify({"lost_request": req.to_dict()}), 200
 
 
@@ -124,4 +126,5 @@ def reject(lost_id: int):
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
+    log_action(_current_user_id(), "lost_reject", "lost_request", lost_id)
     return jsonify({"lost_request": req.to_dict()}), 200

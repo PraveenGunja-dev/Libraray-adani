@@ -10,7 +10,7 @@ import api from '../../lib/api.js';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE || 'http://localhost:5000/api').replace('/api', '');
 
-function lostModal({ copyId, onClose, onSuccess }) {
+function LostBookModal({ copyId, onClose, onSuccess }) {
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -34,7 +34,7 @@ function lostModal({ copyId, onClose, onSuccess }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-navy-950/60 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-extrabold text-corporate-ink">Report Book as lost</h2>
+          <h2 className="text-lg font-extrabold text-corporate-ink">Report Book as Lost</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
         </div>
         {error && <p className="mb-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
@@ -73,8 +73,8 @@ export default function BookBorrow() {
   const [reserving, setReserving] = useState(false);
   const [flash, setFlash] = useState({ type: '', msg: '' });
 
-  const [lostModal, setlostModal] = useState(false);
-  const [lostCopyId, setlostCopyId] = useState(null);
+  const [showLostModal, setShowLostModal] = useState(false);
+  const [lostCopyId, setLostCopyId] = useState(null);
 
   // "My Books" list mode (no pre-selected book)
   const [myBorrows, setMyBorrows] = useState([]);
@@ -132,14 +132,14 @@ export default function BookBorrow() {
     }
   }
 
-  function openlostModal(copyId) {
-    setlostCopyId(copyId);
-    setlostModal(true);
+  function openLostModal(copyId) {
+    setLostCopyId(copyId);
+    setShowLostModal(true);
   }
 
-  function onlostSuccess(msg) {
-    setlostModal(false);
-    setlostCopyId(null);
+  function onLostSuccess(msg) {
+    setShowLostModal(false);
+    setLostCopyId(null);
     showFlash('success', msg);
   }
 
@@ -230,9 +230,9 @@ export default function BookBorrow() {
                   <ActionButton
                     icon={AlertTriangle}
                     variant="danger"
-                    onClick={() => openlostModal(copy.id)}
+                    onClick={() => openLostModal(copy.id)}
                   >
-                    Report lost
+                    Report Lost
                   </ActionButton>
                 )}
               </div>
@@ -240,8 +240,8 @@ export default function BookBorrow() {
           </div>
         </Card>
 
-        {lostModal && (
-          <lostModal copyId={lostCopyId} onClose={() => setlostModal(false)} onSuccess={onlostSuccess} />
+        {showLostModal && (
+          <LostBookModal copyId={lostCopyId} onClose={() => setShowLostModal(false)} onSuccess={onLostSuccess} />
         )}
       </>
     );
@@ -280,9 +280,9 @@ export default function BookBorrow() {
                   key={`st-${r.id}`}
                   icon={AlertTriangle}
                   variant="danger"
-                  onClick={() => openlostModal(r.book_copy_id)}
+                  onClick={() => openLostModal(r.book_copy_id)}
                 >
-                  Report lost
+                  Report Lost
                 </ActionButton>,
               ])}
             />
@@ -305,8 +305,8 @@ export default function BookBorrow() {
         )}
       </div>
 
-      {lostModal && (
-        <lostModal copyId={lostCopyId} onClose={() => setlostModal(false)} onSuccess={onlostSuccess} />
+      {showLostModal && (
+        <LostBookModal copyId={lostCopyId} onClose={() => setShowLostModal(false)} onSuccess={onLostSuccess} />
       )}
     </>
   );

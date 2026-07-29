@@ -10,7 +10,7 @@ import api from '../../lib/api.js';
 
 /**
  * Extract the QR token from scanned data.
- * Handles both raw tokens ("abc123") and URL format ("/employee/scan?token=abc123").
+ * Handles both raw tokens ("abc123") and URL format ("/admin/scan?token=abc123").
  */
 function extractToken(rawData) {
   const text = (rawData || '').trim();
@@ -132,40 +132,58 @@ export default function QRScan() {
     resolveToken(manualToken);
   }
 
-  // ── Borrow form state ──
+  // ── Issue/reserve-for-employee form state ──
   const [empEmail, setEmpEmail] = useState('');
+  const [empSuggestions, setEmpSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [borrowDays, setBorrowDays] = useState(7);
   const [borrowing, setBorrowing] = useState(false);
   const [borrowFlash, setBorrowFlash] = useState({ type: '', msg: '' });
 
-  // Pre-fill employee email from auth if available
+  // Look up matching employees as the admin types, so they don't have to know
+  // the exact email — pick a name off the list instead.
   useEffect(() => {
-    api.get('/auth/me')
-      .then(data => {
-        const user = data.user || data;
-        if (user?.email) setEmpEmail(user.email);
-      })
-      .catch(() => {});
-  }, []);
+    const query = empEmail.trim();
+    if (query.length < 2) {
+      setEmpSuggestions([]);
+      return;
+    }
+    const handle = setTimeout(() => {
+      api.get(`/employees?search=${encodeURIComponent(query)}&per_page=6`)
+        .then(data => setEmpSuggestions(data.employees || []))
+        .catch(() => setEmpSuggestions([]));
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [empEmail]);
+
+  function selectEmployee(emp) {
+    setEmpEmail(emp.email);
+    setEmpSuggestions([]);
+    setShowSuggestions(false);
+  }
+
+  const isIssue = !!scannedCopy?.id;
 
   async function handleBorrow() {
     if (!empEmail.trim() || !scannedBook?.id) return;
     setBorrowing(true);
     setBorrowFlash({ type: '', msg: '' });
     try {
-      if (scannedCopy?.id) {
-        // Copy-level scan -> Borrow
+      if (isIssue) {
+        // Copy-level scan -> issue this specific copy to the employee
         await api.post('/borrow', {
           book_copy_id: scannedCopy.id,
           days_requested: borrowDays,
+          employee_email: empEmail.trim(),
         });
         setBorrowFlash({ type: 'success', msg: `Book issued to ${empEmail} — return by ${new Date(Date.now() + borrowDays * 86400000).toLocaleDateString()}` });
       } else {
-        // Book-level scan -> Reserve
+        // Book-level scan -> no specific copy in hand, so reserve on their behalf
         await api.post('/reservations', {
           book_id: scannedBook.id,
+          employee_email: empEmail.trim(),
         });
-        setBorrowFlash({ type: 'success', msg: `Book successfully reserved for ${empEmail}. An admin will process it shortly.` });
+        setBorrowFlash({ type: 'success', msg: `Book reserved for ${empEmail}. They'll be notified when it's ready.` });
       }
     } catch (err) {
       setBorrowFlash({ type: 'error', msg: err.data?.error || err.message || 'Failed to process request' });
@@ -177,9 +195,9 @@ export default function QRScan() {
   return (
     <>
       <PageHeader
-        eyebrow="QR scan"
+        eyebrow="Circulation desk"
         title="Scan a Book QR Code"
-        description="Point your camera at a book's QR label. The book details will load automatically."
+        description="Scan a book's QR label to issue or reserve it for an employee. This is a librarian-desk workflow — employees no longer scan on their own devices."
       />
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
 
@@ -326,9 +344,16 @@ export default function QRScan() {
                 )}
               </div>
 
-              {/* ── Borrow Form ── */}
+              {/* ── Issue / Reserve Form ── */}
               <div className="mt-6 border-t border-corporate-line pt-5">
-                <h3 className="mb-4 text-lg font-extrabold text-corporate-ink">Borrow This Book</h3>
+                <h3 className="mb-4 text-lg font-extrabold text-corporate-ink">
+                  {isIssue ? 'Issue This Book' : 'Reserve This Book'}
+                </h3>
+                {!isIssue && (
+                  <p className="mb-4 -mt-2 text-sm text-slate-500">
+                    This QR is a book-level label with no specific copy attached, so this will place a reservation instead of an immediate issue.
+                  </p>
+                )}
 
                 {borrowFlash.msg && (
                   <div className={`mb-4 rounded-xl p-3 text-sm font-semibold ${borrowFlash.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
@@ -337,56 +362,78 @@ export default function QRScan() {
                 )}
 
                 <div className="grid gap-4">
-                  {/* Employee ID */}
-                  <div>
-                    <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Employee Email / ID</label>
+                  {/* Employee lookup */}
+                  <div className="relative">
+                    <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Employee Name or Email</label>
                     <input
                       type="text"
                       value={empEmail}
                       onChange={e => setEmpEmail(e.target.value)}
-                      placeholder="e.g. employee@adani.com"
+                      onFocus={() => setShowSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                      placeholder="Start typing a name or email…"
+                      autoComplete="off"
                       className="w-full rounded-xl border border-corporate-line px-3 py-2.5 text-sm text-corporate-ink focus:outline-none focus:ring-2 focus:ring-navy-500"
                     />
+                    {showSuggestions && empSuggestions.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-corporate-line bg-white shadow-soft">
+                        {empSuggestions.map(emp => (
+                          <button
+                            type="button"
+                            key={emp.id}
+                            onClick={() => selectEmployee(emp)}
+                            className="flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                          >
+                            <span className="font-bold text-corporate-ink">{emp.name}</span>
+                            <span className="text-xs text-slate-500">{emp.email}{emp.department ? ` · ${emp.department}` : ''}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Borrow Duration */}
-                  <div>
-                    <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Borrow Duration (Days)</label>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {[7, 14, 21, 30].map(d => (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => setBorrowDays(d)}
-                          className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${borrowDays === d ? 'border-navy-500 bg-navy-50 text-navy-700' : 'border-corporate-line bg-white text-slate-600 hover:bg-slate-50'}`}
-                        >
-                          {d} days
-                        </button>
-                      ))}
-                      <input
-                        type="number"
-                        min={1}
-                        max={90}
-                        value={borrowDays}
-                        onChange={e => setBorrowDays(Math.max(1, Math.min(90, Number(e.target.value))))}
-                        className="w-20 rounded-xl border border-corporate-line px-3 py-2 text-center text-sm font-bold text-corporate-ink focus:outline-none focus:ring-2 focus:ring-navy-500"
-                      />
-                    </div>
-                  </div>
+                  {isIssue && (
+                    <>
+                      {/* Borrow Duration */}
+                      <div>
+                        <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-slate-500">Borrow Duration (Days)</label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {[7, 14, 21, 30].map(d => (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() => setBorrowDays(d)}
+                              className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${borrowDays === d ? 'border-navy-500 bg-navy-50 text-navy-700' : 'border-corporate-line bg-white text-slate-600 hover:bg-slate-50'}`}
+                            >
+                              {d} days
+                            </button>
+                          ))}
+                          <input
+                            type="number"
+                            min={1}
+                            max={90}
+                            value={borrowDays}
+                            onChange={e => setBorrowDays(Math.max(1, Math.min(90, Number(e.target.value))))}
+                            className="w-20 rounded-xl border border-corporate-line px-3 py-2 text-center text-sm font-bold text-corporate-ink focus:outline-none focus:ring-2 focus:ring-navy-500"
+                          />
+                        </div>
+                      </div>
 
-                  {/* Issue / Return dates preview */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-navy-50 p-3">
-                      <p className="text-xs font-bold uppercase text-navy-400">Issue Date</p>
-                      <p className="mt-1 font-bold text-navy-800">{new Date().toLocaleDateString()}</p>
-                    </div>
-                    <div className="rounded-xl bg-navy-50 p-3">
-                      <p className="text-xs font-bold uppercase text-navy-400">Return By</p>
-                      <p className="mt-1 font-bold text-navy-800">{new Date(Date.now() + borrowDays * 86400000).toLocaleDateString()}</p>
-                    </div>
-                  </div>
+                      {/* Issue / Return dates preview */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-navy-50 p-3">
+                          <p className="text-xs font-bold uppercase text-navy-400">Issue Date</p>
+                          <p className="mt-1 font-bold text-navy-800">{new Date().toLocaleDateString()}</p>
+                        </div>
+                        <div className="rounded-xl bg-navy-50 p-3">
+                          <p className="text-xs font-bold uppercase text-navy-400">Return By</p>
+                          <p className="mt-1 font-bold text-navy-800">{new Date(Date.now() + borrowDays * 86400000).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-                  {/* Reserve / Borrow Button */}
+                  {/* Issue / Reserve Button */}
                   <ActionButton
                     icon={QrCode}
                     variant="gradient"
@@ -394,7 +441,9 @@ export default function QRScan() {
                     onClick={handleBorrow}
                     disabled={borrowing || !empEmail.trim()}
                   >
-                    {borrowing ? 'Reserving…' : 'Reserve Book'}
+                    {isIssue
+                      ? (borrowing ? 'Issuing…' : 'Issue Book')
+                      : (borrowing ? 'Reserving…' : 'Reserve Book')}
                   </ActionButton>
                 </div>
               </div>
