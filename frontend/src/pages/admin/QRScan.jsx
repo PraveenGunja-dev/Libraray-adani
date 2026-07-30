@@ -31,6 +31,14 @@ function extractToken(rawData) {
  * actually act on, instead of one generic "camera unavailable" line.
  */
 function describeCameraError(err, insecureContext) {
+  // qr-scanner throws this as a plain string (not an Error) once every camera
+  // attempt — including "any camera at all" — has failed. That almost always
+  // means no camera device is reachable from this browser session at all,
+  // most commonly a Remote Desktop session without webcam redirection enabled.
+  const message = typeof err === 'string' ? err : err?.message || '';
+  if (/camera not found/i.test(message)) {
+    return "No camera device is reachable from this browser, even though the site has permission to use one. If you're connected over Remote Desktop, the local webcam usually isn't passed through — try opening this page directly on the device's own browser instead, or enable webcam redirection in your RDP client's Local Resources settings.";
+  }
   const name = err?.name || '';
   if (name === 'NotReadableError' || name === 'TrackStartError') {
     return "The camera turned on but the video stream couldn't start — this almost always means another app (Zoom, Teams, another browser tab) already has the camera open. Close it and click Start Scan again.";
