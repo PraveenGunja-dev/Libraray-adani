@@ -26,6 +26,30 @@ function extractToken(rawData) {
   return text;
 }
 
+/**
+ * Turn the browser's getUserMedia failure into an explanation an admin can
+ * actually act on, instead of one generic "camera unavailable" line.
+ */
+function describeCameraError(err, insecureContext) {
+  const name = err?.name || '';
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return "The camera turned on but the video stream couldn't start — this almost always means another app (Zoom, Teams, another browser tab) already has the camera open. Close it and click Start Scan again.";
+  }
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError' || name === 'SecurityError') {
+    return 'Camera permission was denied or blocked. Click the camera icon in the address bar, allow access for this site, then try again.';
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No camera was found on this device.';
+  }
+  if (name === 'OverconstrainedError') {
+    return "No camera on this device matches what's needed (e.g. a rear-facing camera). Try a different device or use the manual token field below.";
+  }
+  if (insecureContext) {
+    return 'Camera unavailable — this page must be loaded over https for camera access, and it currently is not.';
+  }
+  return 'Camera unavailable. Grant camera permission or use the manual token field below.';
+}
+
 export default function QRScan() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -140,7 +164,7 @@ export default function QRScan() {
       }, 3000);
     } catch (err) {
       console.error('QR Scanner error:', err);
-      setError('Camera unavailable. Grant camera permission or use the manual token field below.');
+      setError(describeCameraError(err, insecureContext));
     }
   }
 
