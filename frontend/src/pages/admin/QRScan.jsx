@@ -38,6 +38,14 @@ export default function QRScan() {
   const [scannedBook, setScannedBook] = useState(null);
   const [scannedCopy, setScannedCopy] = useState(null);
   const [manualToken, setManualToken] = useState('');
+  const frameCheckRef = useRef(null);
+
+  // Browsers require HTTPS (or localhost) to reliably deliver camera frames.
+  // Over plain http, some corporate setups let the permission prompt through
+  // but the stream never actually delivers video — a black, frozen picture.
+  const insecureContext = typeof window !== 'undefined'
+    && window.isSecureContext === false
+    && location.hostname !== 'localhost';
 
   // Auto-resolve token from URL params (phone camera scan opens this URL)
   useEffect(() => {
@@ -50,6 +58,7 @@ export default function QRScan() {
   // Cleanup scanner on unmount
   useEffect(() => {
     return () => {
+      clearTimeout(frameCheckRef.current);
       if (scannerRef.current) {
         scannerRef.current.stop();
         scannerRef.current.destroy();
@@ -112,6 +121,23 @@ export default function QRScan() {
       scannerRef.current = scanner;
       await scanner.start();
       setScanning(true);
+
+      // The camera permission can succeed while the stream never actually
+      // delivers frames (black/frozen video) — most often an insecure (http)
+      // origin, a physical privacy shutter, or another app holding the camera.
+      // Detect that instead of leaving the admin staring at a dead preview.
+      clearTimeout(frameCheckRef.current);
+      frameCheckRef.current = setTimeout(() => {
+        const video = videoRef.current;
+        if (video && scannerRef.current && video.videoWidth === 0) {
+          stopScan();
+          setError(
+            insecureContext
+              ? 'Camera opened but no picture is coming through — this page is loaded over http, and most browsers silently break camera capture on insecure origins. Ask IT to enable HTTPS, or use the manual token field below.'
+              : 'Camera opened but no picture is coming through. Check for a physical camera privacy shutter, close any other app using the camera (Teams/Zoom), and try again — or use the manual token field below.'
+          );
+        }
+      }, 3000);
     } catch (err) {
       console.error('QR Scanner error:', err);
       setError('Camera unavailable. Grant camera permission or use the manual token field below.');
@@ -119,6 +145,7 @@ export default function QRScan() {
   }
 
   function stopScan() {
+    clearTimeout(frameCheckRef.current);
     if (scannerRef.current) {
       scannerRef.current.stop();
       scannerRef.current.destroy();
@@ -203,6 +230,11 @@ export default function QRScan() {
 
         {/* Scanner panel */}
         <Card className="p-5">
+          {insecureContext && (
+            <p className="mb-4 rounded-xl bg-amber-50 p-3 text-sm font-semibold text-amber-800">
+              This page is loaded over http, not https. Most browsers block or silently break live camera capture on insecure pages — if the camera shows a black screen, that's almost certainly why. Ask IT to enable HTTPS for this site, or use the manual token field below in the meantime.
+            </p>
+          )}
           {/*
             qr-scanner wraps the <video> in its own <div> with position:relative
             and sets the video to position:absolute. We need to let that wrapper
