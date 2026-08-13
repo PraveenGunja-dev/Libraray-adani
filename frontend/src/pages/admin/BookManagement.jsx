@@ -7,7 +7,6 @@ import DataTable from '../../components/DataTable.jsx';
 import PageHeader from '../../components/PageHeader.jsx';
 import api from '../../lib/api.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '/library/api';
 const FORMATS = ['Hardcover', 'Paperback', 'E-Book', 'Journal', 'Magazine', 'Other'];
 
 function AddBookModal({ onClose, onSaved }) {
@@ -319,9 +318,35 @@ export default function BookManagement() {
     }
   }
 
-  function handleBulkQR() {
-    const ids = books.map(b => b.id).join(',');
-    window.open(`${API_BASE}/books/qr-sheet?ids=${ids}`, '_blank');
+  async function handleBulkQR() {
+    if (books.length === 0) return;
+
+    // Open the tab synchronously, in direct response to the click, so browsers
+    // don't treat it as a blocked pop-up — we fill it in once the fetch resolves.
+    const win = window.open('', '_blank');
+    if (!win) {
+      showFlash('Pop-up blocked — allow pop-ups for this site and try again.', false);
+      return;
+    }
+    win.document.write('<p style="font-family:sans-serif;padding:40px;color:#64748b">Generating QR sheet…</p>');
+
+    try {
+      // qr-sheet is a JWT-protected endpoint — window.open(url) can't carry the
+      // Authorization header, so it must be fetched (with auth) and written in,
+      // not navigated to directly.
+      const ids = books.map(b => b.id).join(',');
+      const html = await api.getText(`/books/qr-sheet?ids=${ids}`);
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    } catch (err) {
+      win.document.open();
+      win.document.write(
+        `<p style="font-family:sans-serif;padding:40px;color:#b91c1c">Failed to generate QR sheet: ${err.message || 'Unknown error'}</p>`
+      );
+      win.document.close();
+      showFlash(err.data?.error || err.message || 'Failed to generate QR sheet', false);
+    }
   }
 
   return (

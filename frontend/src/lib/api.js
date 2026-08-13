@@ -43,6 +43,21 @@ const api = {
         return res.json();
       });
   },
+
+  // For endpoints that return raw HTML/text (e.g. printable sheets) rather than JSON.
+  // A plain window.open(url) can't carry the Authorization header, so JWT-protected
+  // endpoints meant to be opened in a new tab/window must be fetched like this instead.
+  getText: async (path) => {
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${BASE}${path}`, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw Object.assign(new Error(err.message || err.error || 'Request failed'), { status: res.status, data: err });
+    }
+    return res.text();
+  },
 };
 
 export default api;

@@ -27,6 +27,33 @@ function extractToken(rawData) {
 }
 
 /**
+ * Sample the current video frame and return its average brightness (0-255).
+ * A small 24x24 canvas is plenty to tell "genuinely black picture" apart
+ * from "a stream that just hasn't started yet" — the latter has zero
+ * dimensions, the former has real dimensions but every pixel near-zero.
+ */
+function sampleFrameBrightness(video) {
+  if (!video.videoWidth || !video.videoHeight) return null;
+  try {
+    const canvas = document.createElement('canvas');
+    const size = 24;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, size, size);
+    const { data } = ctx.getImageData(0, 0, size, size);
+    let total = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      total += (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
+    return total / (data.length / 4);
+  } catch {
+    // Cross-origin or not-ready-yet — treat as inconclusive, not an error.
+    return null;
+  }
+}
+
+/**
  * Turn the browser's getUserMedia failure into an explanation an admin can
  * actually act on, instead of one generic "camera unavailable" line.
  */
@@ -70,7 +97,16 @@ export default function QRScan() {
   const [scannedBook, setScannedBook] = useState(null);
   const [scannedCopy, setScannedCopy] = useState(null);
   const [manualToken, setManualToken] = useState('');
+  const [blackFrameSuspected, setBlackFrameSuspected] = useState(false);
+  const [frameBrightness, setFrameBrightness] = useState(null);
   const frameCheckRef = useRef(null);
+  const brightnessIntervalRef = useRef(null);
+
+  // Camera availability — checked proactively on load instead of waiting for
+  // a failed scan attempt, so the admin sees the real situation up front.
+  const [cameraCheck, setCameraCheck] = useState('checking'); // 'checking' | 'available' | 'none'
+  const [cameras, setCameras] = useState([]); // [{id, label}]
+  const [selectedCameraId, setSelectedCameraId] = useState('');
 
   // Browsers require HTTPS (or localhost) to reliably deliver camera frames.
   // Over plain http, some corporate setups let the permission prompt through
@@ -78,6 +114,19 @@ export default function QRScan() {
   const insecureContext = typeof window !== 'undefined'
     && window.isSecureContext === false
     && location.hostname !== 'localhost';
+
+  // Proactively check for a usable camera as soon as the page loads.
+  useEffect(() => {
+    QrScanner.hasCamera()
+      .then(has => setCameraCheck(has ? 'available' : 'none'))
+      .catch(() => setCameraCheck('none'));
+    // Device labels are only populated once camera permission has been granted
+    // at least once — before that this may return unlabeled entries or none,
+    // which is fine; it's a convenience list, not the source of truth.
+    QrScanner.listCameras(true)
+      .then(list => setCameras(list || []))
+      .catch(() => setCameras([]));
+  }, []);
 
   // Auto-resolve token from URL params (phone camera scan opens this URL)
   useEffect(() => {
@@ -91,6 +140,7 @@ export default function QRScan() {
   useEffect(() => {
     return () => {
       clearTimeout(frameCheckRef.current);
+      clearInterval(brightnessIntervalRef.current);
       if (scannerRef.current) {
         scannerRef.current.stop();
         scannerRef.current.destroy();
@@ -142,7 +192,7 @@ export default function QRScan() {
         },
         {
           onDecodeError: () => {}, // per-frame decode errors are expected
-          preferredCamera: 'environment',
+          preferredCamera: selectedCameraId || 'environment',
           highlightScanRegion: true,
           highlightCodeOutline: true,
           maxScansPerSecond: 5,
@@ -153,11 +203,16 @@ export default function QRScan() {
       scannerRef.current = scanner;
       await scanner.start();
       setScanning(true);
+      setCameraCheck('available');
+
+      // Camera labels are only populated once permission has been granted —
+      // refresh the list now so the picker shows real device names.
+      QrScanner.listCameras(true).then(list => setCameras(list || [])).catch(() => {});
 
       // The camera permission can succeed while the stream never actually
-      // delivers frames (black/frozen video) — most often an insecure (http)
-      // origin, a physical privacy shutter, or another app holding the camera.
-      // Detect that instead of leaving the admin staring at a dead preview.
+      // delivers frames at all (zero dimensions) — most often an insecure
+      // (http) origin or another app holding the camera. Detect that instead
+      // of leaving the admin staring at a dead preview.
       clearTimeout(frameCheckRef.current);
       frameCheckRef.current = setTimeout(() => {
         const video = videoRef.current;
@@ -166,10 +221,24 @@ export default function QRScan() {
           setError(
             insecureContext
               ? 'Camera opened but no picture is coming through — this page is loaded over http, and most browsers silently break camera capture on insecure origins. Ask IT to enable HTTPS, or use the manual token field below.'
-              : 'Camera opened but no picture is coming through. Check for a physical camera privacy shutter, close any other app using the camera (Teams/Zoom), and try again — or use the manual token field below.'
+              : 'Camera opened but no picture is coming through. Close any other app using the camera (Teams/Zoom) and try again — or use the manual token field below.'
           );
         }
       }, 3000);
+
+      // Separately: the stream can have real dimensions but every pixel be
+      // black — a physical lens cover/shutter is the classic cause, and it's
+      // distinguishable from "no stream at all" by actually sampling pixels.
+      // Runs on an interval (not once) so it self-clears if the shutter gets
+      // opened mid-scan, instead of needing Stop/Start again.
+      clearInterval(brightnessIntervalRef.current);
+      brightnessIntervalRef.current = setInterval(() => {
+        const video = videoRef.current;
+        if (!video || !scannerRef.current || video.videoWidth === 0) return;
+        const brightness = sampleFrameBrightness(video);
+        setFrameBrightness(brightness);
+        setBlackFrameSuspected(brightness !== null && brightness < 8);
+      }, 1500);
     } catch (err) {
       console.error('QR Scanner error:', err);
       setError(describeCameraError(err, insecureContext));
@@ -178,6 +247,9 @@ export default function QRScan() {
 
   function stopScan() {
     clearTimeout(frameCheckRef.current);
+    clearInterval(brightnessIntervalRef.current);
+    setBlackFrameSuspected(false);
+    setFrameBrightness(null);
     if (scannerRef.current) {
       scannerRef.current.stop();
       scannerRef.current.destroy();
@@ -189,6 +261,18 @@ export default function QRScan() {
   function handleManualLookup(e) {
     e.preventDefault();
     resolveToken(manualToken);
+  }
+
+  async function handleCameraChange(id) {
+    setSelectedCameraId(id);
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.setCamera(id || 'environment');
+      } catch (err) {
+        console.error('Switch camera error:', err);
+        setError(describeCameraError(err, insecureContext));
+      }
+    }
   }
 
   // ── Issue/reserve-for-employee form state ──
@@ -267,6 +351,29 @@ export default function QRScan() {
               This page is loaded over http, not https. Most browsers block or silently break live camera capture on insecure pages — if the camera shows a black screen, that's almost certainly why. Ask IT to enable HTTPS for this site, or use the manual token field below in the meantime.
             </p>
           )}
+          {cameraCheck === 'none' && (
+            <p className="mb-4 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+              No camera was detected on this browser session. If you're connected over Remote Desktop, the local webcam usually isn't passed through — try opening this page directly on the device's own browser, or use the manual token field below.
+            </p>
+          )}
+          {cameras.length > 1 && (
+            <div className="mb-4">
+              <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Camera</label>
+              <select
+                value={selectedCameraId}
+                onChange={e => handleCameraChange(e.target.value)}
+                className="w-full rounded-xl border border-corporate-line bg-white px-3 py-2 text-sm font-semibold text-corporate-ink"
+              >
+                <option value="">Auto (default)</option>
+                {cameras.map(cam => (
+                  <option key={cam.id} value={cam.id}>{cam.label || `Camera ${cam.id.slice(0, 8)}`}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-400">
+                If the default camera shows a black screen or the wrong feed, pick a different one here.
+              </p>
+            </div>
+          )}
           {/*
             qr-scanner wraps the <video> in its own <div> with position:relative
             and sets the video to position:absolute. We need to let that wrapper
@@ -276,6 +383,14 @@ export default function QRScan() {
             .qr-container video {
               width: 100% !important;
               height: 100% !important;
+              /* qr-scanner sometimes force-hides the video via inline
+                 opacity/visibility as a Safari workaround when it briefly
+                 sees the element as display:none during start-up — the
+                 stream keeps playing, but the picture becomes invisible.
+                 Override that unconditionally; this element's actual
+                 show/hide is fully controlled by the display style below. */
+              opacity: 1 !important;
+              visibility: visible !important;
               object-fit: cover !important;
               border-radius: 1rem;
             }
@@ -303,7 +418,15 @@ export default function QRScan() {
               <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:34px_34px]" />
             )}
 
-            {/* Video element — qr-scanner takes control of this */}
+            {/* Video element — qr-scanner takes control of this.
+                Kept permanently display:block (never toggled) — qr-scanner
+                inspects the element's computed style right as it starts, and
+                if it ever sees display:none at that moment, it "fixes" it but
+                also force-hides the video a different way (opacity:0) as a
+                side effect, assuming the app must have wanted it hidden on
+                purpose. Toggling display here raced with that check. The
+                idle placeholder overlay below covers this visually instead
+                while not scanning, so hiding it via display was never needed. */}
             <video
               ref={videoRef}
               playsInline
@@ -312,7 +435,6 @@ export default function QRScan() {
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                display: scanning ? 'block' : 'none',
               }}
             />
 
@@ -329,6 +451,12 @@ export default function QRScan() {
             )}
           </div>
 
+          {blackFrameSuspected && (
+            <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+              The camera is live (the light is on) but every frame it's sending is completely black — this is almost always a physical privacy shutter/cover slid over the lens, not a software problem. Check for a small sliding switch right next to the camera and make sure it's open. To confirm: open the Windows Camera app separately — if it's black there too, it's the shutter, not this page.
+            </p>
+          )}
+
           {error && (
             <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</p>
           )}
@@ -338,6 +466,11 @@ export default function QRScan() {
               {scanning
                 ? 'Scanning — hold the QR code steady in the frame.'
                 : 'Click Start Scan to activate the camera.'}
+              {scanning && frameBrightness !== null && (
+                <span className="ml-2 font-mono text-xs text-slate-400">
+                  (signal check: {Math.round(frameBrightness)}/255)
+                </span>
+              )}
             </p>
             {scanning
               ? <ActionButton icon={StopCircle} variant="subtle" onClick={stopScan}>Stop Scan</ActionButton>

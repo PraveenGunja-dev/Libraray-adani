@@ -20,7 +20,12 @@ def create_app(config_class=Config):
     db.init_app(app)
     migrate.init_app(app, db, render_as_batch=True)
     jwt.init_app(app)
-    cors.init_app(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
+    # Resource keys are regexes matched against the request path, not glob
+    # patterns — routes are mounted under /library/api/*, so that's what must
+    # be matched (a bare r"/api/*" here never matches and silently disables
+    # CORS for every real route, which breaks any cross-origin dev setup,
+    # e.g. the Vite dev server on a different port than the Flask backend).
+    cors.init_app(app, resources={r"/library/api/.*": {"origins": "*", "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}})
 
     # Import models so Alembic sees them
     from app.models import (  # noqa: F401
